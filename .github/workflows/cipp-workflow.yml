@@ -42,6 +42,16 @@ jobs:
           action: "upload"
           app_location: "out"
           skip_app_build: true
+      # Same alert as the API fork's deploy workflow: n8n files an Internal RCS ticket.
+      - name: Alert n8n on failure
+        if: failure() && github.event_name == 'push'
+        env:
+          WEBHOOK: ${{ secrets.N8N_CIPP_WEBHOOK }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          jq -n --arg m "CIPP frontend deploy failed (run ${{ github.run_id }}): cipp.relian.co is not on the latest main, so the frontend and API may be on different versions. Re-run: $RUN_URL" \
+            '{Tenant:"None", API:"Deploy", Severity:"Alert", Username:"GitHub Actions", sentAsAlert:true, Message:$m}' \
+            | curl -fsS -X POST -H 'Content-Type: application/json' --data @- "$WEBHOOK"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
